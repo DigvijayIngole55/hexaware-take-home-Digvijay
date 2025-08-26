@@ -1,0 +1,107 @@
+{
+  "timestamp": "2025-08-25T22:42:18.911649",
+  "url": "https://drive.google.com/drive/folders/1h6GptTW3DPCdhu7q5tY-83CXrpV8TmY_?usp=drive_link",
+  "result": {
+    "success": true,
+    "message": "Downloaded 16 PDF files",
+    "count": 16,
+    "files": [
+      {
+        "id": "1xKpBFi9B9lDkrbi_6ypHGM5q0lSIt29j",
+        "name": "Accounting Basics - Nicolas Boucher.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1xKpBFi9B9lDkrbi_6ypHGM5q0lSIt29j",
+        "local_path": "downloads/Accounting Basics - Nicolas Boucher.pdf"
+      },
+      {
+        "id": "1r6a1syjOMQtfNnSNtHY-BwDPdn65u0Gl",
+        "name": "Adopting Rust to Achieve Business Goals.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1r6a1syjOMQtfNnSNtHY-BwDPdn65u0Gl",
+        "local_path": "downloads/Adopting Rust to Achieve Business Goals.pdf"
+      },
+      {
+        "id": "1RDNxioM5ERb8k4btY9GBLDVidjP435h2",
+        "name": "Algorithms .pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1RDNxioM5ERb8k4btY9GBLDVidjP435h2",
+        "local_path": "downloads/Algorithms .pdf"
+      },
+      {
+        "id": "1FZ5eBG5D1zTypUvKHoUGsNQMrsbNGXue",
+        "name": "Azure Notes.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1FZ5eBG5D1zTypUvKHoUGsNQMrsbNGXue",
+        "local_path": "downloads/Azure Notes.pdf"
+      },
+      {
+        "id": "1_MK3PURUsXoLN5SR1VmBMWyJw0GlBa6C",
+        "name": "Business Models.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1_MK3PURUsXoLN5SR1VmBMWyJw0GlBa6C",
+        "local_path": "downloads/Business Models.pdf"
+      },
+      {
+        "id": "10drGCpJ_X5410XS618J79ruMhmWmADgA",
+        "name": "Context Engineering 101.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=10drGCpJ_X5410XS618J79ruMhmWmADgA",
+        "local_path": "downloads/Context Engineering 101.pdf"
+      },
+      {
+        "id": "12OKxOsjzXNPSRb9-9bTUDZ2KC0BiSmUR",
+        "name": "Critical Logs to Monitor_A Guide for SOC Analysts .pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=12OKxOsjzXNPSRb9-9bTUDZ2KC0BiSmUR",
+        "local_path": "downloads/Critical Logs to Monitor_A Guide for SOC Analysts .pdf"
+      },
+      {
+        "id": "141KLeSjIjHPKcnrSE5uAccytGLAQn8V5",
+        "name": "Design Patterns.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=141KLeSjIjHPKcnrSE5uAccytGLAQn8V5",
+        "local_path": "downloads/Design Patterns.pdf"
+      },
+      {
+        "id": "1qv34ku3ZmB4aOC3HapzycAmcLrruR6_P",
+        "name": "DevOps Complete Package.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1qv34ku3ZmB4aOC3HapzycAmcLrruR6_P",
+        "local_path": "downloads/DevOps Complete Package.pdf"
+      },
+      {
+        "id": "1thQ_EPYjlfTY9ImECNquClaSBAvpUOBv",
+        "name": "Docker.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1thQ_EPYjlfTY9ImECNquClaSBAvpUOBv",
+        "local_path": "downloads/Docker.pdf"
+      },
+      {
+        "id": "1L5T_hIf_AliZBOiClu6mhmHmRg4UsOXA",
+        "name": "Dynamic programm notes.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1L5T_hIf_AliZBOiClu6mhmHmRg4UsOXA",
+        "local_path": "downloads/Dynamic programm notes.pdf"
+      },
+      {
+        "id": "13yAlVVwc4WkLVf0P5ozaMAU1yfLcJzFc",
+        "name": "FortiOS-5.6.11-Rest-API_Reference.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=13yAlVVwc4WkLVf0P5ozaMAU1yfLcJzFc",
+        "local_path": "downloads/FortiOS-5.6.11-Rest-API_Reference.pdf"
+      },
+      {
+        "id": "1Vq261q4ERdhgAG9QQafR-_V3SsZyEWCm",
+        "name": "Heap and Stack memory written by Yusha Al-Ayoub.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1Vq261q4ERdhgAG9QQafR-_V3SsZyEWCm",
+        "local_path": "downloads/Heap and Stack memory written by Yusha Al-Ayoub.pdf"
+      },
+      {
+        "id": "15_RsSWF559ItgYSnlVFSamRS1p5wLGES",
+        "name": "Mental Models To Improve Your Thinking_.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=15_RsSWF559ItgYSnlVFSamRS1p5wLGES",
+        "local_path": "downloads/Mental Models To Improve Your Thinking_.pdf"
+      },
+      {
+        "id": "1v_zYG2DgoJzGSJ9oiBqxH0-RmUCfLjiD",
+        "name": "Product Management.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1v_zYG2DgoJzGSJ9oiBqxH0-RmUCfLjiD",
+        "local_path": "downloads/Product Management.pdf"
+      },
+      {
+        "id": "1cV3lZTUqlApXqGH-AdZBT4SO8F_jOO3N",
+        "name": "Websites that will save 100s of hours!.pdf",
+        "download_link": "https://drive.google.com/uc?export=download&id=1cV3lZTUqlApXqGH-AdZBT4SO8F_jOO3N",
+        "local_path": "downloads/Websites that will save 100s of hours!.pdf"
+      }
+    ]
+  }
+}

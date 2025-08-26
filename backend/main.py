@@ -139,9 +139,15 @@ async def query(request: QueryRequest):
 
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest(request: IngestRequest):
-    result = download_all_files_from_folder(request.google_drive_url)
-    
-    save_download_result(result, request.google_drive_url)
+    if DEBUG:
+        cached_download = load_download_result()
+        if cached_download:
+            result = cached_download
+        else:
+            result = download_all_files_from_folder(request.google_drive_url)
+            save_download_result(result, request.google_drive_url)
+    else:
+        result = download_all_files_from_folder(request.google_drive_url)
     
     if not result["success"] or not result.get("files"):
         return IngestResponse(

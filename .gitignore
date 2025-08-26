@@ -47,3 +47,6 @@ venv.bak/
 
 # Downloads folder
 downloads/
+
+# Cache folder with debug files
+cache/

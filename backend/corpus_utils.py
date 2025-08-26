@@ -19,8 +19,12 @@ def create_corpus_from_extraction(extraction_results: List[Dict]) -> List[Dict[s
     return corpus
 
 
-def save_corpus_result(corpus: List[Dict[str, str]], url: str, debug_file: str = "corpus_result.json"):
+def save_corpus_result(corpus: List[Dict[str, str]], url: str, debug_file: str = "cache/corpus_result.json"):
     try:
+        cache_dir = os.path.dirname(debug_file)
+        if cache_dir and not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+        
         debug_data = {
             "timestamp": datetime.now().isoformat(),
             "url": url,
@@ -34,7 +38,7 @@ def save_corpus_result(corpus: List[Dict[str, str]], url: str, debug_file: str =
         pass
 
 
-def load_corpus_result(debug_file: str = "corpus_result.json") -> List[Dict[str, str]]:
+def load_corpus_result(debug_file: str = "cache/corpus_result.json") -> List[Dict[str, str]]:
     if not os.path.exists(debug_file):
         return None
     

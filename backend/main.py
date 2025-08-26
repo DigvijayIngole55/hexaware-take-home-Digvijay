@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uvicorn
 import json
 import os
@@ -9,16 +9,24 @@ from datetime import datetime
 from google_drive_utils import download_all_files_from_folder
 from pdf_utils import extract_text_from_files_list
 from corpus_utils import create_corpus_from_extraction, save_corpus_result, load_corpus_result
+from chunking_utils import create_chunks_from_corpus, add_dense_vectors, create_elasticsearch_documents, save_chunks_result, load_chunks_result
 
 DEBUG = True
-DEBUG_DOWNLOAD_FILE = "download_result.json"
-DEBUG_EXTRACTION_FILE = "extraction_result.json"
-DEBUG_CORPUS_FILE = "corpus_result.json"
+DEBUG_DOWNLOAD_FILE = "cache/download_result.json"
+DEBUG_EXTRACTION_FILE = "cache/extraction_result.json"
+DEBUG_CORPUS_FILE = "cache/corpus_result.json"
+DEBUG_CHUNKS_FILE = "cache/chunks_result.json"
+
+def ensure_cache_directory():
+    cache_dir = "cache"
+    if not os.path.exists(cache_dir):
+        os.makedirs(cache_dir)
 
 def save_download_result(result: dict, url: str):
     if not DEBUG:
         return
     
+    ensure_cache_directory()
     debug_data = {
         "timestamp": datetime.now().isoformat(),
         "url": url,
@@ -46,6 +54,7 @@ def save_extraction_result(extraction_results: list, url: str):
     if not DEBUG:
         return
     
+    ensure_cache_directory()
     debug_data = {
         "timestamp": datetime.now().isoformat(),
         "url": url,
@@ -124,6 +133,15 @@ class CorpusItem(BaseModel):
     pdf_link: str
     corpus: str
 
+class ChunkDocument(BaseModel):
+    chunk_id: str
+    filename: str
+    drive_url: str
+    raw_text: str
+    dense_vector: List[float]
+    text_for_elser: str
+    metadata: Dict
+
 class IngestResponse(BaseModel):
     status: str
     message: str
@@ -131,6 +149,8 @@ class IngestResponse(BaseModel):
     files: List[FileInfo]
     extracted_texts: List[ExtractedFileInfo]
     corpus: List[CorpusItem]
+    chunks: List[ChunkDocument]
+    chunks_count: int
 
 class HealthResponse(BaseModel):
     status: str
@@ -187,8 +207,22 @@ async def ingest(request: IngestRequest):
     else:
         corpus = create_corpus_from_extraction(extraction_results)
     
+    if DEBUG:
+        cached_chunks = load_chunks_result(DEBUG_CHUNKS_FILE)
+        if cached_chunks:
+            chunks = cached_chunks
+        else:
+            chunks = create_chunks_from_corpus(corpus)
+            chunks = add_dense_vectors(chunks)
+            chunks = create_elasticsearch_documents(chunks)
+            save_chunks_result(chunks, request.google_drive_url, DEBUG_CHUNKS_FILE)
+    else:
+        chunks = create_chunks_from_corpus(corpus)
+        chunks = add_dense_vectors(chunks)
+        chunks = create_elasticsearch_documents(chunks)
+    
     successful_extractions = [r for r in extraction_results if r["success"]]
-    extraction_message = f"Downloaded {result['count']} files, extracted text from {len(successful_extractions)}, created corpus for {len(corpus)} documents"
+    extraction_message = f"Downloaded {result['count']} files, extracted text from {len(successful_extractions)}, created corpus for {len(corpus)} documents, generated {len(chunks)} chunks"
     
     return IngestResponse(
         status="success" if result["success"] and successful_extractions else "partial" if result["success"] else "error",
@@ -196,7 +230,9 @@ async def ingest(request: IngestRequest):
         documents_processed=result["count"],
         files=result.get("files", []),
         extracted_texts=extraction_results,
-        corpus=corpus
+        corpus=corpus,
+        chunks=chunks,
+        chunks_count=len(chunks)
     )
 
 

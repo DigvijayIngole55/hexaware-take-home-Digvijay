@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RAG Pipeline{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e9ecef;
+        }
+        .main-container {
+            background: #212529;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid #495057;
+        }
+        .navbar-custom {
+            background: linear-gradient(45deg, #343a40, #495057);
+            border-radius: 15px 15px 0 0;
+        }
+        .card {
+            background: #343a40;
+            border: 1px solid #495057;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+            color: #e9ecef;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: #6c757d;
+        }
+        .card-header {
+            background: #495057 !important;
+            border-bottom: 1px solid #6c757d;
+        }
+        .btn-custom {
+            border-radius: 25px;
+            padding: 10px 25px;
+        }
+        .answer-box {
+            background: #2d3748;
+            border-left: 4px solid #0dcaf0;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #e9ecef;
+        }
+        .citation-item {
+            background: #495057;
+            color: #e9ecef;
+            padding: 8px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 5px;
+            font-size: 0.9em;
+        }
+        .status-healthy {
+            color: #20c997;
+        }
+        .status-unhealthy {
+            color: #fd7e14;
+        }
+        .form-control {
+            background: #495057;
+            border: 1px solid #6c757d;
+            color: #e9ecef;
+        }
+        .form-control:focus {
+            background: #495057;
+            border-color: #0dcaf0;
+            color: #e9ecef;
+            box-shadow: 0 0 0 0.2rem rgba(13, 202, 240, 0.25);
+        }
+        .form-select {
+            background: #495057;
+            border: 1px solid #6c757d;
+            color: #e9ecef;
+        }
+        .form-select:focus {
+            background: #495057;
+            border-color: #0dcaf0;
+            color: #e9ecef;
+            box-shadow: 0 0 0 0.2rem rgba(13, 202, 240, 0.25);
+        }
+        .form-label {
+            color: #e9ecef;
+        }
+        .form-text {
+            color: #adb5bd;
+        }
+        .text-muted {
+            color: #adb5bd !important;
+        }
+        .alert-warning {
+            background: #664d03;
+            border-color: #997404;
+            color: #ffecb5;
+        }
+        .alert-info {
+            background: #055160;
+            border-color: #087990;
+            color: #b6effb;
+        }
+        .alert-success {
+            background: #0a3622;
+            border-color: #0f5132;
+            color: #b3e5c7;
+        }
+        .alert-danger {
+            background: #58151c;
+            border-color: #842029;
+            color: #f5c2c7;
+        }
+        .list-unstyled li {
+            color: #e9ecef;
+        }
+        .lead {
+            color: #adb5bd;
+        }
+        
+        /* Chat Interface Styles */
+        .chat-container {
+            height: calc(100vh - 4rem);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            background: linear-gradient(45deg, #343a40, #495057);
+            border-radius: 15px 15px 0 0;
+            padding: 1rem;
+            border-bottom: 1px solid #6c757d;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: #212529;
+        }
+        
+        .chat-input-area {
+            padding: 1rem;
+            background: #343a40;
+            border-radius: 0 0 15px 15px;
+            border-top: 1px solid #6c757d;
+        }
+        
+        .message {
+            margin-bottom: 1rem;
+            max-width: 70%;
+        }
+        
+        .message.user {
+            margin-left: auto;
+        }
+        
+        .message.assistant {
+            margin-right: auto;
+        }
+        
+        .message-content {
+            padding: 0.75rem 1rem;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+        
+        .message.user .message-content {
+            background: #0dcaf0;
+            color: #000;
+        }
+        
+        .message.assistant .message-content {
+            background: #495057;
+            color: #e9ecef;
+        }
+        
+        .message-time {
+            font-size: 0.75rem;
+            color: #adb5bd;
+            margin-top: 0.25rem;
+        }
+        
+        .message.user .message-time {
+            text-align: right;
+        }
+        
+        .message.assistant .message-time {
+            text-align: left;
+        }
+        
+        .chat-input {
+            border-radius: 25px;
+            padding: 0.75rem 1rem;
+            background: #495057;
+            border: 1px solid #6c757d;
+            color: #e9ecef;
+        }
+        
+        .chat-input:focus {
+            background: #495057;
+            border-color: #0dcaf0;
+            color: #e9ecef;
+            box-shadow: 0 0 0 0.2rem rgba(13, 202, 240, 0.25);
+        }
+        
+        .btn-chat {
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+
+        
+        .citations {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: #2d3748;
+            border-radius: 8px;
+            border-left: 3px solid #0dcaf0;
+        }
+        
+        .citation-tag {
+            display: inline-block;
+            background: #495057;
+            color: #e9ecef;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin: 0.125rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-container">
+            <!-- Chat Interface -->
+            <div class="chat-container">
+                <div class="chat-header">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-brain me-2"></i>
+                        <h5 class="mb-0">RAG Pipeline Assistant</h5>
+                        <div class="ms-auto d-flex align-items-center">
+                            <button class="btn btn-success btn-sm me-2" onclick="showIngestModal()">
+                                <i class="fas fa-upload me-1"></i>Ingest
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="checkHealth()">
+                                <i class="fas fa-heart me-1"></i>Health
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingest Modal -->
+    <div class="modal fade" id="ingestModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content bg-dark">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-light">
+                        <i class="fas fa-upload me-2"></i>Ingest Documents
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="ingestForm">
+                        <div class="mb-3">
+                            <label for="googleDriveUrl" class="form-label text-light">Google Drive URL</label>
+                            <input type="url" class="form-control chat-input" id="googleDriveUrl" 
+                                   placeholder="https://drive.google.com/drive/folders/..." required>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-upload me-1"></i>Start Ingestion
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let chatMessages = [];
+        
+        function showIngestModal() {
+            new bootstrap.Modal(document.getElementById('ingestModal')).show();
+        }
+        
+        async function checkHealth() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                const status = data.backend && data.backend.status === 'healthy' ? 'healthy' : 'unhealthy';
+                updateStatusIndicator(status);
+                
+                // Just update the indicator, no chat message
+            } catch (error) {
+                updateStatusIndicator('unhealthy');
+            }
+        }
+        
+        function updateStatusIndicator(status) {
+            const indicator = document.getElementById('status-indicator');
+            if (status === 'healthy') {
+                indicator.className = 'badge bg-success';
+                indicator.innerHTML = '<i class="fas fa-circle"></i>';
+            } else {
+                indicator.className = 'badge bg-danger';
+                indicator.innerHTML = '<i class="fas fa-circle"></i>';
+            }
+        }
+        
+        function addMessage(sender, content, citations = null) {
+            const messagesContainer = document.getElementById('chatMessages');
+            if (!messagesContainer) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            
+            let citationsHtml = '';
+            if (citations && citations.length > 0) {
+                citationsHtml = `
+                    <div class="citations">
+                        <small class="text-muted">Sources:</small><br>
+                        ${citations.map(citation => `<span class="citation-tag">${citation}</span>`).join('')}
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    ${content.replace(/\n/g, '<br>')}
+                    ${citationsHtml}
+                </div>
+                <div class="message-time">${new Date().toLocaleTimeString()}</div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            chatMessages.push({ sender, content, citations, timestamp: new Date() });
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            // Add user message
+            addMessage('user', question);
+            input.value = '';
+            
+            // Show typing indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message assistant';
+            typingDiv.id = 'typing-indicator';
+            typingDiv.innerHTML = `
+                <div class="message-content">
+                    <i class="fas fa-ellipsis-h"></i> Thinking...
+                </div>
+            `;
+            document.getElementById('chatMessages').appendChild(typingDiv);
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+            
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+                
+                const data = await response.json();
+                
+                // Remove typing indicator
+                document.getElementById('typing-indicator').remove();
+                
+                // Add assistant response
+                addMessage('assistant', data.answer, data.citations);
+                
+            } catch (error) {
+                document.getElementById('typing-indicator').remove();
+                addMessage('assistant', 'Sorry, I encountered an error while processing your question. Please make sure the backend is running.');
+            }
+        }
+        
+        // Handle ingest form submission
+        document.getElementById('ingestForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const url = document.getElementById('googleDriveUrl').value;
+            
+            try {
+                const response = await fetch('/api/ingest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ google_drive_url: url })
+                });
+                
+                const data = await response.json();
+                
+                bootstrap.Modal.getInstance(document.getElementById('ingestModal')).hide();
+                
+                addMessage('assistant', `Ingestion completed!\n• Status: ${data.status}\n• Message: ${data.message}\n• Documents processed: ${data.documents_processed}`);
+                
+            } catch (error) {
+                addMessage('assistant', 'Ingestion failed: Unable to connect to backend');
+            }
+        });
+        
+        // Check health on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkHealth();
+        });
+        
+        // Handle enter key in chat input
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && e.target.id === 'chatInput') {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

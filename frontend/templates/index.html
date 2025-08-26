@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}RAG Pipeline Chat{% endblock %}
+
+{% block content %}
+<!-- Chat Messages Area -->
+<div class="chat-messages" id="chatMessages">
+    <!-- Messages will be dynamically added here -->
+</div>
+
+<!-- Chat Input Area -->
+<div class="chat-input-area">
+    <div class="d-flex align-items-center">
+        <input type="text" 
+               class="form-control chat-input me-3" 
+               id="chatInput" 
+               placeholder="Ask a question about your documents..."
+               autocomplete="off">
+        <button class="btn btn-primary btn-chat" onclick="sendMessage()">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}

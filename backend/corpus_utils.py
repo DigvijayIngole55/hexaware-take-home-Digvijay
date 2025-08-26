@@ -82,13 +82,6 @@ def create_corpus_summary(corpus: List[Dict[str, str]]) -> Dict[str, any]:
     }
 
 
-def filter_corpus_by_min_length(corpus: List[Dict[str, str]], min_length: int = 100) -> List[Dict[str, str]]:
-    return [
-        item for item in corpus 
-        if len(item.get("corpus", "")) >= min_length
-    ]
-
-
 def get_corpus_statistics(corpus: List[Dict[str, str]]) -> Dict[str, any]:
     if not corpus:
         return {

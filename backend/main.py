@@ -8,10 +8,12 @@ import os
 from datetime import datetime
 from google_drive_utils import download_all_files_from_folder
 from pdf_utils import extract_text_from_files_list
+from corpus_utils import create_corpus_from_extraction, save_corpus_result, load_corpus_result
 
 DEBUG = True
 DEBUG_DOWNLOAD_FILE = "download_result.json"
 DEBUG_EXTRACTION_FILE = "extraction_result.json"
+DEBUG_CORPUS_FILE = "corpus_result.json"
 
 def save_download_result(result: dict, url: str):
     if not DEBUG:
@@ -117,12 +119,18 @@ class ExtractedFileInfo(BaseModel):
     ocr_pages_count: Optional[int] = 0
     error: Optional[str]
 
+class CorpusItem(BaseModel):
+    pdf_name: str
+    pdf_link: str
+    corpus: str
+
 class IngestResponse(BaseModel):
     status: str
     message: str
     documents_processed: int
     files: List[FileInfo]
     extracted_texts: List[ExtractedFileInfo]
+    corpus: List[CorpusItem]
 
 class HealthResponse(BaseModel):
     status: str
@@ -155,7 +163,8 @@ async def ingest(request: IngestRequest):
             message=result["message"],
             documents_processed=result["count"],
             files=result.get("files", []),
-            extracted_texts=[]
+            extracted_texts=[],
+            corpus=[]
         )
     
     if DEBUG:
@@ -168,15 +177,26 @@ async def ingest(request: IngestRequest):
     else:
         extraction_results = extract_text_from_files_list(result["files"])
     
+    if DEBUG:
+        cached_corpus = load_corpus_result(DEBUG_CORPUS_FILE)
+        if cached_corpus:
+            corpus = cached_corpus
+        else:
+            corpus = create_corpus_from_extraction(extraction_results)
+            save_corpus_result(corpus, request.google_drive_url, DEBUG_CORPUS_FILE)
+    else:
+        corpus = create_corpus_from_extraction(extraction_results)
+    
     successful_extractions = [r for r in extraction_results if r["success"]]
-    extraction_message = f"Downloaded {result['count']} files, extracted text from {len(successful_extractions)}"
+    extraction_message = f"Downloaded {result['count']} files, extracted text from {len(successful_extractions)}, created corpus for {len(corpus)} documents"
     
     return IngestResponse(
         status="success" if result["success"] and successful_extractions else "partial" if result["success"] else "error",
         message=extraction_message,
         documents_processed=result["count"],
         files=result.get("files", []),
-        extracted_texts=extraction_results
+        extracted_texts=extraction_results,
+        corpus=corpus
     )
 
 

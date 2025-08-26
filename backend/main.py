@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 import uvicorn
 from datetime import datetime
+from google_drive_utils import download_all_files_from_folder
 
 app = FastAPI(title="RAG Pipeline API", description="A RAG injection pipeline from Google Drive", version="1.0.0")
 
@@ -48,17 +49,25 @@ async def query(request: QueryRequest):
         citations=["Document 1", "Document 2"]
     )
 
+
+
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest(request: IngestRequest):
     """
-    Loads/re-indexes docs from Google Drive
-    TODO: Implement Google Drive document ingestion
+    Downloads and saves all documents from a Google Drive folder
     """
-    # Placeholder implementation
+    print(f"Ingesting documents from folder: {request.google_drive_url}")
+    
+    # Download all files from the Google Drive folder
+    result = download_all_files_from_folder(request.google_drive_url)
+    
+    # Convert the result to the expected response format
+    status = "success" if result["success"] else "error"
+    
     return IngestResponse(
-        status="success",
-        message=f"Successfully processed documents from {request.google_drive_url}",
-        documents_processed=0
+        status=status,
+        message=result["message"],
+        documents_processed=result["count"]
     )
 
 @app.get("/healthz", response_model=HealthResponse)

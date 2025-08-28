@@ -6,7 +6,6 @@ from datetime import datetime
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-for-rag-pipeline'
 
-# Backend API configuration
 API_BASE_URL = "http://localhost:8080"
 
 def get_api_data(endpoint):
@@ -47,21 +46,31 @@ def query():
     """Query interface for asking questions"""
     if request.method == 'POST':
         question = request.form.get('question', '').strip()
+        search_type = request.form.get('search_type', '')  
+        size = int(request.form.get('size', 5))
         
         if not question:
             flash("Please enter a question", "error")
             return render_template('query.html')
         
-        # Call the RAG API
-        result = post_api_data("/query", {"question": question})
+        query_params = {
+            "question": question,
+            "type": "elser" if search_type == "elser" else "hybrid",
+            "size": size
+        }
+        
+        result = post_api_data("/query", query_params)
         
         if result:
             return render_template('query.html', 
                                  question=question, 
+                                 search_type=query_params["type"],
+                                 size=size,
                                  answer=result.get('answer'), 
                                  citations=result.get('citations', []))
         else:
             flash("Error getting answer from RAG system", "error")
+            return render_template('query.html', question=question, search_type=query_params.get("type", "hybrid"), size=size)
     
     return render_template('query.html')
 
@@ -75,7 +84,6 @@ def ingest():
             flash("Please enter a Google Drive URL", "error")
             return render_template('ingest.html')
         
-        # Call the ingest API
         result = post_api_data("/ingest", {"google_drive_url": google_drive_url})
         
         if result:
@@ -109,12 +117,19 @@ def api_query():
     """API endpoint for chat interface queries"""
     data = request.get_json()
     question = data.get('question', '').strip()
+    search_type = data.get('type', 'hybrid')
+    size = data.get('size', 5)
     
     if not question:
         return jsonify({"error": "Question is required"}), 400
     
-    # Call the RAG API
-    result = post_api_data("/query", {"question": question})
+    query_params = {
+        "question": question,
+        "type": search_type,
+        "size": size
+    }
+    
+    result = post_api_data("/query", query_params)
     
     if result:
         return jsonify(result)
@@ -130,7 +145,6 @@ def api_ingest():
     if not google_drive_url:
         return jsonify({"error": "Google Drive URL is required"}), 400
     
-    # Call the ingest API
     result = post_api_data("/ingest", {"google_drive_url": google_drive_url})
     
     if result:

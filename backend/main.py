@@ -6,12 +6,16 @@ import uvicorn
 import json
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()
 from google_drive_utils import download_all_files_from_folder
 from pdf_utils import extract_text_from_files_list
 from corpus_utils import create_corpus_from_extraction, save_corpus_result, load_corpus_result
 from chunking_utils import create_chunks_from_corpus, add_dense_vectors, create_elasticsearch_documents, save_chunks_result, load_chunks_result
 from sentence_transformers import SentenceTransformer
-from elasticsearch_utils import get_elasticsearch_client, create_chunks_index, index_chunks, get_index_stats, search_bm25, search_dense_vector, search_elser, search_hybrid
+from elasticsearch_utils import get_elasticsearch_client, create_chunks_index, index_chunks, get_index_stats, search_bm25, search_dense_vector, search_elser, search_hybrid, search_hybrid_rrf
+from ollama_utils import generate_answer_from_chunks
 
 DEBUG = True
 AUTO_LOAD_TO_ELASTICSEARCH = True  
@@ -101,7 +105,6 @@ def load_extraction_result() -> list:
 
 app = FastAPI(title="RAG Pipeline API", description="A RAG injection pipeline from Google Drive", version="1.0.0")
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  
@@ -112,42 +115,17 @@ app.add_middleware(
 
 class QueryRequest(BaseModel):
     question: str
-    search_type: Optional[str] = "hybrid"
-    size: Optional[int] = 10
-    min_score: Optional[float] = 0.1
+    type: Optional[str] = "hybrid"
+    size: Optional[int] = 5
+    k: Optional[int] = 60
+    use_llm: Optional[bool] = True
     
 class QueryResponse(BaseModel):
     answer: str
     citations: List[str]
-
-class SearchRequest(BaseModel):
-    query: str
-    search_type: str = "bm25"
-    size: Optional[int] = 10
-    min_score: Optional[float] = 0.1
-    bm25_weight: Optional[float] = 0.2
-    dense_weight: Optional[float] = 0.3
-    elser_weight: Optional[float] = 0.5
-
-class SearchResult(BaseModel):
-    chunk_id: str
-    filename: str
-    drive_url: str
-    raw_text: str
-    score: float
-    metadata: Dict
-    highlights: Optional[Dict] = None
-
-class SearchResponse(BaseModel):
-    success: bool
-    search_type: str
-    query: str
-    total_hits: int
-    max_score: Optional[float]
-    results: List[SearchResult]
-    took_ms: int
-    error: Optional[str] = None
-    weights: Optional[Dict] = None
+    sources_used: Optional[int] = 0
+    source_files: Optional[List[str]] = []
+    generation_method: Optional[str] = "retrieval_only"
     
 class IngestRequest(BaseModel):
     google_drive_url: str
@@ -213,94 +191,115 @@ class HealthResponse(BaseModel):
 
 @app.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
-    print(f"Processing query: '{request.question}' with all search types")
+    print(f"Processing query: '{request.question}' with type: {request.type}, use_llm: {request.use_llm}")
     
     try:
-        query_vector = generate_query_embedding(request.question)
-        
-        print("Calling BM25 search...")
-        bm25_result = search_bm25(
-            query=request.question,
-            size=5,
-            min_score=0.1
-        )
-        
-        print("Calling Dense Vector search...")
-        dense_result = None
-        if query_vector:
-            print(f"Generated embedding vector length: {len(query_vector)}")
-            print(f"First 5 values: {query_vector[:5]}")
-            dense_result = search_dense_vector(
+        if request.type == "hybrid":
+            query_vector = generate_query_embedding(request.question)
+            if not query_vector:
+                print("Warning: Failed to generate query embedding, proceeding without dense vector")
+            
+            result = search_hybrid_rrf(
+                query=request.question,
                 query_vector=query_vector,
-                size=5
+                size=request.size,
+                k=request.k
+            )
+            
+            print(f"\n HYBRID RRF SEARCH RESULTS ({len(result['results'])} found):")
+            if result["success"] and result["results"]:
+                for i, hit in enumerate(result["results"], 1):
+                    rrf_score = hit.get('rrf_score', 0)
+                    found_in = hit.get('found_in', {})
+                    methods = [k for k, v in found_in.items() if v]
+                    print(f"{i}. [{hit['filename']}] RRF Score: {rrf_score:.4f}")
+                    print(f"   Found in: {', '.join(methods)}")
+                    print(f"   Text: {hit['raw_text'][:150]}...")
+                    print()
+                        
+        elif request.type == "elser":
+            result = search_elser(
+                query=request.question,
+                size=request.size,
+                min_score=0.0
+            )
+            
+            print(f"\n ELSER SEARCH RESULTS ({len(result['results'])} found):")
+            if result["success"] and result["results"]:
+                for i, hit in enumerate(result["results"], 1):
+                    print(f"{i}. [{hit['filename']}] Score: {hit['score']:.3f}")
+                    print(f"   Text: {hit['raw_text'][:150]}...")
+                    print()
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid search type: {request.type}. Supported types: hybrid, elser"
             )
         
-        print("Calling ELSER search...")
-        elser_result = search_elser(
-            query=request.question,
-            size=5,
-            min_score=0.1
-        )
+        if not result["success"]:
+            return QueryResponse(
+                answer=f"Search failed: {result.get('error', 'Unknown error')}",
+                citations=[],
+                generation_method="error"
+            )
         
-        print("\n" + "="*80)
-        print(f"SEARCH RESULTS COMPARISON FOR: '{request.question}'")
-        print("="*80)
-        
-        print("\n🔍 BM25 SEARCH RESULTS:")
-        if bm25_result["success"] and bm25_result["results"]:
-            for i, result in enumerate(bm25_result["results"], 1):
-                print(f"{i}. [{result['filename']}] Score: {result['score']:.3f}")
-                print(f"   Text: {result['raw_text'][:150]}...")
-                print()
+        if request.use_llm and result["results"]:
+            print(f"\n🤖 GENERATING LLM ANSWER using {len(result['results'])} retrieved chunks...")
+            
+            llm_result = generate_answer_from_chunks(
+                query=request.question,
+                chunks=result["results"],
+                max_chunks=min(request.size, 5),
+                model_name="gemma3:4b"
+            )
+            
+            if llm_result["success"]:
+                answer = llm_result["answer"]
+                generation_method = "llm_generated"
+                sources_used = llm_result.get("sources_used", 0)
+                source_files = llm_result.get("source_files", [])
+                
+                citations = [f"{filename}" for filename in source_files[:5]]
+                
+                print(f"✅ LLM successfully generated answer using {sources_used} sources")
+            else:
+                print(f"❌ LLM generation failed: {llm_result.get('error')}")
+                answer = f"I found {len(result['results'])} relevant documents but couldn't generate a comprehensive answer. Please try again or check if the Hugging Face API is available."
+                generation_method = "llm_failed"
+                sources_used = 0
+                source_files = []
+                citations = [f"{r['filename']}" for r in result["results"][:3]]
         else:
-            print("   No BM25 results found")
-        
-        print("\n🧠 DENSE VECTOR SEARCH RESULTS:")
-        if dense_result and dense_result["success"] and dense_result["results"]:
-            for i, result in enumerate(dense_result["results"], 1):
-                print(f"{i}. [{result['filename']}] Score: {result['score']:.3f}")
-                print(f"   Text: {result['raw_text'][:150]}...")
-                print()
-        else:
-            print("   No Dense Vector results found")
-        
-        print("\n🎯 ELSER SEARCH RESULTS:")
-        if elser_result["success"] and elser_result["results"]:
-            for i, result in enumerate(elser_result["results"], 1):
-                print(f"{i}. [{result['filename']}] Score: {result['score']:.3f}")
-                print(f"   Text: {result['raw_text'][:150]}...")
-                print()
-        else:
-            print("   No ELSER results found")
-        
-        print("="*80)
-        bm25_count = len(bm25_result["results"]) if bm25_result["success"] else 0
-        dense_count = len(dense_result["results"]) if dense_result and dense_result["success"] else 0
-        elser_count = len(elser_result["results"]) if elser_result["success"] else 0
-        
-        answer = f"Search comparison for '{request.question}':\n"
-        answer += f"• BM25: {bm25_count} results\n"
-        answer += f"• Dense Vector: {dense_count} results\n"
-        answer += f"• ELSER: {elser_count} results\n\n"
-        answer += "Check the console output for detailed results comparison."
-        citations = []
-        if bm25_result["success"]:
-            citations.extend([f"BM25: {r['filename']} ({r['score']:.3f})" for r in bm25_result["results"][:2]])
-        if dense_result and dense_result["success"]:
-            citations.extend([f"Dense: {r['filename']} ({r['score']:.3f})" for r in dense_result["results"][:2]])
-        if elser_result["success"]:
-            citations.extend([f"ELSER: {r['filename']} ({r['score']:.3f})" for r in elser_result["results"][:2]])
+            if request.type == "hybrid":
+                answer = f"Found {len(result['results'])} relevant documents:\n\n"
+                for i, hit in enumerate(result["results"][:3], 1):
+                    answer += f"{i}. **{hit['filename']}**\n"
+                    answer += f"   {hit['raw_text'][:200]}...\n\n"
+            else:
+                answer = f"Found {len(result['results'])} relevant documents using ELSER search.\n\n"
+                for i, hit in enumerate(result["results"][:3], 1):
+                    answer += f"{i}. **{hit['filename']}** (Score: {hit['score']:.3f})\n"
+                    answer += f"   {hit['raw_text'][:200]}...\n\n"
+            
+            generation_method = "retrieval_only"
+            sources_used = len(result["results"])
+            source_files = [r['filename'] for r in result["results"]]
+            citations = [f"{r['filename']}" for r in result["results"][:5]]
         
         return QueryResponse(
             answer=answer,
-            citations=citations[:6]
+            citations=citations,
+            sources_used=sources_used,
+            source_files=source_files,
+            generation_method=generation_method
         )
         
     except Exception as e:
         print(f"Error processing query: {e}")
         return QueryResponse(
             answer=f"Error processing query: {str(e)}",
-            citations=[]
+            citations=[],
+            generation_method="error"
         )
 
 

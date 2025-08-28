@@ -185,7 +185,7 @@ def delete_index(index_name: str = "hexaware_chunks") -> bool:
         return False
 
 
-def search_bm25(query: str, index_name: str = "hexaware_chunks", size: int = 10, min_score: float = 0.1) -> Dict[str, any]:
+def search_bm25(query: str, index_name: str = "hexaware_chunks", size: int = 5, min_score: float = 0.1) -> Dict[str, any]:
     """
     Perform BM25 text search using Elasticsearch match query.
     
@@ -279,7 +279,7 @@ def search_bm25(query: str, index_name: str = "hexaware_chunks", size: int = 10,
         }
 
 
-def search_dense_vector(query_vector: List[float], index_name: str = "hexaware_chunks", size: int = 10) -> Dict[str, any]:
+def search_dense_vector(query_vector: List[float], index_name: str = "hexaware_chunks", size: int = 5) -> Dict[str, any]:
     """
     Perform dense vector search using Elasticsearch kNN query.
     
@@ -351,7 +351,7 @@ def search_dense_vector(query_vector: List[float], index_name: str = "hexaware_c
         }
 
 
-def search_elser(query: str, index_name: str = "hexaware_chunks", size: int = 10, min_score: float = 0.1) -> Dict[str, any]:
+def search_elser(query: str, index_name: str = "hexaware_chunks", size: int = 5, min_score: float = 0.1) -> Dict[str, any]:
     """
     Perform ELSER semantic search using Elasticsearch text_expansion query.
     Note: This requires ELSER model to be deployed in Elasticsearch.
@@ -422,8 +422,121 @@ def search_elser(query: str, index_name: str = "hexaware_chunks", size: int = 10
         }
 
 
+def calculate_rrf_score(rank: int, k: int = 60) -> float:
+    """
+    Calculate Reciprocal Rank Fusion (RRF) score.
+    
+    Args:
+        rank: Position in the ranking (0-based)
+        k: RRF constant (typically 60)
+        
+    Returns:
+        RRF score
+    """
+    return 1.0 / (k + rank + 1)
+
+
+def search_hybrid_rrf(query: str, query_vector: Optional[List[float]] = None, index_name: str = "hexaware_chunks", 
+                     size: int = 5, k: int = 60) -> Dict[str, any]:
+    """
+    Perform hybrid search using Reciprocal Rank Fusion (RRF) to combine BM25, dense vector, and ELSER search results.
+    
+    Args:
+        query: The search query text
+        query_vector: Optional query embedding vector for dense search
+        index_name: Elasticsearch index name
+        size: Number of final results to return
+        k: RRF constant (typically 60)
+        
+    Returns:
+        Dictionary containing RRF-ranked search results and metadata
+    """
+    print(f"Performing RRF hybrid search for query: '{query}' in index: {index_name}")
+    
+    search_size = min(size * 3, 50)  # Get more results for better RRF
+    
+    bm25_results = search_bm25(query, index_name, search_size, min_score=0.0)
+    bm25_chunks = {result['chunk_id']: {'result': result, 'rank': i} 
+                   for i, result in enumerate(bm25_results.get('results', []))}
+    
+    dense_chunks = {}
+    if query_vector and len(query_vector) == 384:
+        dense_results = search_dense_vector(query_vector, index_name, search_size)
+        dense_chunks = {result['chunk_id']: {'result': result, 'rank': i} 
+                       for i, result in enumerate(dense_results.get('results', []))}
+    
+    elser_results = search_elser(query, index_name, search_size, min_score=0.0)
+    elser_chunks = {result['chunk_id']: {'result': result, 'rank': i} 
+                   for i, result in enumerate(elser_results.get('results', []))}
+    
+    all_chunks = set()
+    all_chunks.update(bm25_chunks.keys())
+    all_chunks.update(dense_chunks.keys())
+    all_chunks.update(elser_chunks.keys())
+    
+    rrf_scores = {}
+    for chunk_id in all_chunks:
+        rrf_score = 0.0
+        
+        if chunk_id in bm25_chunks:
+            rrf_score += calculate_rrf_score(bm25_chunks[chunk_id]['rank'], k)
+        
+        if chunk_id in dense_chunks:
+            rrf_score += calculate_rrf_score(dense_chunks[chunk_id]['rank'], k)
+        
+        if chunk_id in elser_chunks:
+            rrf_score += calculate_rrf_score(elser_chunks[chunk_id]['rank'], k)
+        
+        result_data = None
+        if chunk_id in elser_chunks:
+            result_data = elser_chunks[chunk_id]['result']
+        elif chunk_id in dense_chunks:
+            result_data = dense_chunks[chunk_id]['result']
+        elif chunk_id in bm25_chunks:
+            result_data = bm25_chunks[chunk_id]['result']
+        
+        if result_data:
+            rrf_scores[chunk_id] = {
+                'rrf_score': rrf_score,
+                'result': result_data,
+                'found_in': {
+                    'bm25': chunk_id in bm25_chunks,
+                    'dense': chunk_id in dense_chunks,
+                    'elser': chunk_id in elser_chunks
+                }
+            }
+    
+    sorted_results = sorted(rrf_scores.items(), key=lambda x: x[1]['rrf_score'], reverse=True)[:size]
+    
+    final_results = []
+    for chunk_id, data in sorted_results:
+        result = data['result'].copy()
+        result['rrf_score'] = data['rrf_score']
+        result['found_in'] = data['found_in']
+        final_results.append(result)
+    
+    print(f"RRF hybrid search completed. Found {len(final_results)} results")
+    
+    return {
+        "success": True,
+        "search_type": "hybrid_rrf",
+        "query": query,
+        "rrf_k": k,
+        "total_candidates": len(all_chunks),
+        "search_stats": {
+            "bm25_results": len(bm25_results.get('results', [])),
+            "dense_results": len(dense_results.get('results', [])) if query_vector else 0,
+            "elser_results": len(elser_results.get('results', []))
+        },
+        "results": final_results,
+        "took_ms": (bm25_results.get('took_ms', 0) + 
+                   (dense_results.get('took_ms', 0) if query_vector else 0) + 
+                   elser_results.get('took_ms', 0))
+    }
+
+
 def search_hybrid(query: str, query_vector: Optional[List[float]] = None, index_name: str = "hexaware_chunks", 
-                 size: int = 10, bm25_weight: float = 0.2, dense_weight: float = 0.3, elser_weight: float = 0.5) -> Dict[str, any]:
+                 size: int = 5, bm25_weight: float = 0.2, dense_weight: float = 0.3, elser_weight: float = 0.5) -> Dict[str, any]:
     """
     Perform hybrid search combining BM25, dense vector, and ELSER search methods.
     

@@ -16,6 +16,30 @@
             </div>
             <div class="card-body">
                 <form method="POST">
+                    <!-- Search Configuration -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Search Type</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="searchTypeToggle" name="search_type" value="elser" 
+                                       {% if search_type == 'elser' %}checked{% endif %}>
+                                <label class="form-check-label" for="searchTypeToggle" id="searchTypeLabel">
+                                    {% if search_type == 'elser' %}ELSER Search{% else %}Hybrid RRF Search{% endif %}
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                <small><strong>Hybrid:</strong> ELSER + Dense + BM25 with RRF | <strong>ELSER:</strong> Semantic search only</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="topK" class="form-label">Top-K Results</label>
+                            <input type="number" class="form-control" id="topK" name="size" 
+                                   value="{% if size %}{{ size }}{% else %}5{% endif %}" 
+                                   min="1" max="20" step="1">
+                            <div class="form-text">Number of results to return (1-20)</div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label for="question" class="form-label">Your Question *</label>
                         <textarea class="form-control" id="question" name="question" rows="3" 
@@ -99,6 +123,23 @@
     document.getElementById('question').addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = (this.scrollHeight) + 'px';
+    });
+
+    // Handle search type toggle
+    document.getElementById('searchTypeToggle').addEventListener('change', function() {
+        const label = document.getElementById('searchTypeLabel');
+        if (this.checked) {
+            label.textContent = 'ELSER Search';
+        } else {
+            label.textContent = 'Hybrid RRF Search';
+        }
+    });
+
+    // Validate top-K input
+    document.getElementById('topK').addEventListener('input', function() {
+        const value = parseInt(this.value);
+        if (value < 1) this.value = 1;
+        if (value > 20) this.value = 20;
     });
 </script>
 {% endblock %}

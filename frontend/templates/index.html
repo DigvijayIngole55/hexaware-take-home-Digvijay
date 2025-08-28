@@ -3,20 +3,34 @@
 {% block title %}RAG Pipeline Chat{% endblock %}
 
 {% block content %}
-<!-- Chat Messages Area -->
 <div class="chat-messages" id="chatMessages">
-    <!-- Messages will be dynamically added here -->
+    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-center" id="emptyState">
+        <div class="mb-4">
+            <i class="fas fa-comments" style="font-size: 3rem; color: var(--accent-primary); opacity: 0.6;"></i>
+        </div>
+        <h4 class="mb-3" style="color: var(--text-secondary); font-weight: 600;">Welcome to RAG Assistant</h4>
+        <p class="text-muted mb-4" style="max-width: 400px;">
+            Start a conversation by asking questions about your documents. 
+            I'll search through your knowledge base and provide detailed answers with citations.
+        </p>
+        <div class="d-flex gap-2 flex-wrap justify-content-center">
+            <span class="badge bg-secondary">Try: "What is Docker?"</span>
+            <span class="badge bg-secondary">Try: "Explain design patterns"</span>
+            <span class="badge bg-secondary">Try: "How does DevOps work?"</span>
+        </div>
+    </div>
 </div>
 
-<!-- Chat Input Area -->
 <div class="chat-input-area">
-    <div class="d-flex align-items-center">
-        <input type="text" 
-               class="form-control chat-input me-3" 
-               id="chatInput" 
-               placeholder="Ask a question about your documents..."
-               autocomplete="off">
-        <button class="btn btn-primary btn-chat" onclick="sendMessage()">
+    <div class="d-flex align-items-center gap-3">
+        <div class="flex-grow-1 position-relative">
+            <input type="text" 
+                   class="form-control chat-input" 
+                   id="chatInput" 
+                   placeholder="Ask a question about your documents..."
+                   autocomplete="off">
+        </div>
+        <button class="btn btn-primary btn-chat" onclick="sendMessage()" id="sendButton">
             <i class="fas fa-paper-plane"></i>
         </button>
     </div>

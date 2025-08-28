@@ -430,12 +430,57 @@ async def ingest(request: IngestRequest):
 
 
 
-@app.get("/healthz", response_model=HealthResponse)
+@app.get("/healthz")
 async def health_check():
-    return HealthResponse(
-        status="healthy",
-        timestamp=datetime.now()
-    )
+    health_status = {
+        "status": "healthy",
+        "timestamp": datetime.now(),
+        "services": {}
+    }
+    
+    try:
+        es_client = get_elasticsearch_client()
+        es_health = es_client.cluster.health()
+        
+        health_status["services"]["elasticsearch"] = {
+            "status": es_health.get("status", "unknown"),
+            "cluster_name": es_health.get("cluster_name", "unknown"),
+            "number_of_nodes": es_health.get("number_of_nodes", 0),
+            "active_primary_shards": es_health.get("active_primary_shards", 0)
+        }
+        
+        if es_health.get("status") in ["red"]:
+            health_status["status"] = "unhealthy"
+        elif es_health.get("status") in ["yellow"]:
+            health_status["status"] = "warning"
+            
+    except Exception as e:
+        health_status["services"]["elasticsearch"] = {
+            "status": "error",
+            "error": str(e)
+        }
+        health_status["status"] = "unhealthy"
+    
+    try:
+        stats = get_index_stats("hexaware_chunks")
+        if stats["success"]:
+            health_status["services"]["index"] = {
+                "status": "healthy",
+                "document_count": stats.get("document_count", 0),
+                "index_size": stats.get("index_size", "0b")
+            }
+        else:
+            health_status["services"]["index"] = {
+                "status": "warning",
+                "message": "Index not found or inaccessible"
+            }
+    except Exception as e:
+        health_status["services"]["index"] = {
+            "status": "error",
+            "error": str(e)
+        }
+    
+    return health_status
 
 @app.get("/")
 async def root():

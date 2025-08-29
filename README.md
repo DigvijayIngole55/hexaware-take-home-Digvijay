@@ -1,16 +1,18 @@
 # Google Drive RAG Document System
 
-A complete document processing and text extraction system that downloads documents from Google Drive, extracts text using PyMuPDF with OCR fallback, and provides intelligent document processing capabilities.
+A complete RAG (Retrieval-Augmented Generation) system that downloads documents from Google Drive, processes them with advanced text extraction and OCR, chunks and indexes them in Elasticsearch, and provides intelligent question-answering using local LLM models.
 
 ## 🚀 Features
 
 - **📂 Google Drive Integration**: Automatic document download from public Google Drive folders
 - **📄 Advanced PDF Processing**: Text extraction with PyMuPDF and OCR fallback using pytesseract
 - **🔍 Smart Text Extraction**: Automatic OCR for pages with minimal text content (<50 characters)
-- **📊 Comprehensive Metadata**: File information, download links, local paths, and extraction statistics
-- **🐛 Debug Mode**: Separate debug files for download and extraction results
-- **⚡ Health Monitoring**: System status monitoring
-- **🔄 Modular Design**: Clean separation between download and text extraction processes
+- **📊 Intelligent Document Chunking**: Smart text segmentation for optimal RAG performance
+- **🔍 Vector Search**: Elasticsearch-powered semantic search with sentence transformers
+- **🤖 Local LLM Integration**: Ollama with Gemma 3 4B model for question answering
+- **📝 RAG Pipeline**: Complete retrieval-augmented generation with source citations
+- **⚡ Health Monitoring**: System status monitoring for all components
+- **🔄 Modular Design**: Clean separation between ingestion, indexing, and query processes
 
 ## 📁 Project Structure
 
@@ -20,9 +22,12 @@ hexaware-take-home-Digvijay/
 │   ├── main.py                   # FastAPI server with ingest and query endpoints
 │   ├── google_drive_utils.py     # Google Drive file download utilities
 │   ├── pdf_utils.py              # PDF text extraction with OCR fallback
+│   ├── chunking_utils.py         # Text chunking utilities for RAG
+│   ├── corpus_utils.py           # Document corpus management
+│   ├── elasticsearch_utils.py    # Elasticsearch integration for vector search
+│   ├── ollama_utils.py           # Ollama LLM client and utilities
+│   ├── prompts.py                # LLM prompts for RAG pipeline
 │   ├── requirements.txt          # Backend dependencies
-│   ├── download_result.json      # Debug: Download results (when DEBUG=True)
-│   ├── extraction_result.json    # Debug: Text extraction results (when DEBUG=True)
 │   └── downloads/                # Downloaded PDF files
 ├── frontend/
 │   ├── app.py                    # Flask web interface
@@ -32,6 +37,7 @@ hexaware-take-home-Digvijay/
 │       ├── index.html            # Main interface
 │       ├── ingest.html           # Document ingestion interface
 │       └── query.html            # Query interface
+├── docker-compose.yml            # Docker services (Elasticsearch & Kibana)
 ├── .gitignore                    # Git ignore file
 └── README.md                     # This file
 ```
@@ -43,6 +49,8 @@ hexaware-take-home-Digvijay/
 - Python 3.8 or higher
 - pip (Python package manager)
 - Tesseract OCR engine (for OCR functionality)
+- Ollama (for local LLM functionality)
+- Docker & Docker Compose (for Elasticsearch/Kibana stack)
 
 ### Install Tesseract OCR
 
@@ -58,6 +66,39 @@ sudo apt-get install tesseract-ocr
 
 **On Windows:**
 Download and install from: https://github.com/UB-Mannheim/tesseract/wiki
+
+### Install Ollama (Local LLM)
+
+**On macOS/Linux:**
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+```
+
+**On Windows:**
+Download and install from: https://ollama.ai/download
+
+After installation, pull the required model:
+```bash
+ollama pull gemma3:4b
+```
+
+Start Ollama server:
+```bash
+ollama serve
+```
+
+### Docker Setup (Elasticsearch & Kibana)
+
+Start the Elasticsearch and Kibana services:
+```bash
+docker-compose up -d
+```
+
+Verify services are running:
+- **Elasticsearch**: http://localhost:9200
+- **Kibana**: http://localhost:5601
+
+In Docker, Tesseract OCR is included automatically. For local development, you still need to install Tesseract manually.
 
 ### Backend Setup (FastAPI)
 
@@ -116,9 +157,9 @@ The frontend will be available at: http://localhost:5001
 
 ### Core APIs
 
-- `POST /ingest` - Download documents from Google Drive and extract text
-- `POST /query` - Submit a question and get an answer with citations (placeholder)
-- `GET /healthz` - Health check endpoint
+- `POST /ingest` - Download documents from Google Drive, extract text, chunk, and index to Elasticsearch
+- `POST /query` - Submit a question and get an intelligent answer with source citations
+- `GET /healthz` - Health check endpoint for all system components
 
 ### Request/Response Models
 
@@ -179,15 +220,22 @@ The frontend will be available at: http://localhost:5001
 **Request:**
 ```json
 {
-  "question": "What is the main topic of the documents?"
+  "question": "What is the main topic of the documents?",
+  "type": "hybrid",
+  "size": 5,
+  "k": 60,
+  "use_llm": true
 }
 ```
 
 **Response:**
 ```json
 {
-  "answer": "This is a placeholder answer for: What is the main topic...",
-  "citations": ["Document 1", "Document 2"]
+  "answer": "Based on the retrieved documents, the main topics covered include accounting principles, financial analysis, and business management fundamentals. The documents provide comprehensive coverage of...",
+  "citations": ["Accounting Basics.pdf", "Financial Analysis Guide.pdf", "Business Management.pdf"],
+  "sources_used": 3,
+  "source_files": ["Accounting Basics.pdf", "Financial Analysis Guide.pdf", "Business Management.pdf"],
+  "generation_method": "llm_generated"
 }
 ```
 
@@ -213,12 +261,16 @@ The frontend will be available at: http://localhost:5001
 - **Error Handling**: Graceful fallback if OCR fails
 - **Statistics Tracking**: Reports OCR usage per document
 
-### File Processing Workflow
+### RAG Pipeline Workflow
 1. **URL Parsing**: Extracts folder ID from Google Drive URLs
 2. **File Discovery**: Finds all files in the public folder
 3. **Download**: Downloads files to local storage
 4. **Text Extraction**: Processes each PDF with OCR fallback
-5. **Metadata Collection**: Gathers file information and statistics
+5. **Document Chunking**: Intelligently segments text for optimal retrieval
+6. **Embedding Generation**: Creates vector embeddings using sentence transformers
+7. **Elasticsearch Indexing**: Stores documents and embeddings for hybrid search
+8. **Query Processing**: Performs semantic + keyword search for relevant chunks
+9. **Answer Generation**: Uses Ollama LLM to generate contextual responses with citations
 
 ## 🔧 Configuration
 
@@ -239,20 +291,33 @@ SUPPORTED_PATTERNS = ['pdf', 'doc', 'docx', 'txt', 'xlsx', 'ppt', 'pptx', 'jpg',
 
 ## 🧪 Testing the System
 
-### Start Both Applications:
+### Start All Services:
 ```bash
-# Terminal 1: Backend
+# Terminal 1: Start Docker services (Elasticsearch & Kibana)
+docker-compose up -d
+
+# Terminal 2: Start Ollama server
+ollama serve
+
+# Terminal 3: Backend
 cd backend && python main.py
 
-# Terminal 2: Frontend  
+# Terminal 4: Frontend  
 cd frontend && python app.py
 ```
 
-### Use the Document System:
+### Service URLs:
+- **Frontend**: http://localhost:5001
+- **Backend API**: http://localhost:8080
+- **Elasticsearch**: http://localhost:9200
+- **Kibana**: http://localhost:5601
+- **Ollama**: http://localhost:11434
+
+### Use the RAG System:
 1. **Open**: http://localhost:5001
-2. **Ingest Documents**: Provide a public Google Drive folder URL
-3. **Review Results**: Check downloaded files and extracted text
-4. **Query Documents**: Ask questions about your indexed document content (placeholder)
+2. **Ingest Documents**: Provide a public Google Drive folder URL to download, chunk, and index documents
+3. **Review Results**: Check downloaded files, extracted text, and Elasticsearch indexing
+4. **Query Documents**: Ask intelligent questions and get answers with source citations
 
 ### Test API Directly:
 ```bash
@@ -261,14 +326,38 @@ curl -X POST "http://localhost:8080/ingest" \
      -H "Content-Type: application/json" \
      -d '{"google_drive_url": "https://drive.google.com/drive/folders/YOUR_FOLDER_ID"}'
 
-# Test query endpoint
+# Test query endpoint with RAG
 curl -X POST "http://localhost:8080/query" \
      -H "Content-Type: application/json" \
-     -d '{"question": "What is in the documents?"}'
+     -d '{"question": "What is in the documents?", "type": "hybrid", "use_llm": true}'
 
 # Health check
 curl "http://localhost:8080/healthz"
 ```
+
+## 🏗️ RAG Architecture
+
+### System Components
+- **Document Ingestion**: Google Drive integration with PDF processing and OCR
+- **Text Processing**: Intelligent chunking with tiktoken for optimal segment sizes
+- **Vector Database**: Elasticsearch with dense vector support for semantic search
+- **Embedding Model**: Sentence transformers for document and query vectorization
+- **LLM Integration**: Ollama with Gemma 3 4B model for natural language generation
+- **Hybrid Search**: Combines semantic vector search with keyword matching (RRF)
+
+### Data Flow
+```
+Google Drive → Download → Extract Text → Chunk Documents → Generate Embeddings
+                ↓
+User Query → Vector Search + Keyword Search → Retrieve Relevant Chunks
+                ↓
+Context + Query → Ollama LLM → Generate Answer with Citations
+```
+
+### Search Methods
+- **Hybrid Search**: Combines vector similarity and keyword matching using Reciprocal Rank Fusion (RRF)
+- **Vector Search**: Semantic similarity using sentence transformer embeddings
+- **Keyword Search**: Traditional BM25 scoring for exact term matches
 
 ## 📊 Technical Features
 
@@ -285,20 +374,28 @@ curl "http://localhost:8080/healthz"
 - **Smart Detection**: Automatically determines when OCR is needed
 - **Comprehensive Metadata**: Extracts PDF properties and statistics
 
+### LLM Integration
+- **Ollama**: Local LLM server for question answering
+- **Gemma 3 4B**: Default model for generating responses
+- **Elasticsearch**: Vector search and document storage
+- **RAG Pipeline**: Retrieval-augmented generation for accurate answers
+
 ### Performance Optimizations
 - **Conditional OCR**: Only uses OCR when necessary (char_count < 50)
 - **High-Resolution Processing**: 2x scaling for better OCR accuracy
 - **Batch Processing**: Handles multiple files efficiently
 - **Debug Caching**: Reuses results in debug mode for faster iteration
 
-## 🔄 Future Enhancements
+## 🚀 Current RAG Features
 
-### RAG Implementation (Next Steps)
-1. **Vector Database**: Add ChromaDB for document embeddings
-2. **Embedding Model**: Integrate sentence transformers or OpenAI embeddings
-3. **LLM Integration**: Connect to OpenAI GPT or local LLM for question answering
-4. **Citation System**: Implement proper source attribution
-5. **Query Processing**: Replace placeholder with actual RAG functionality
+### Implemented RAG Pipeline
+1. **✅ Vector Database**: Elasticsearch for document embeddings and search
+2. **✅ Embedding Model**: Sentence transformers for document vectorization  
+3. **✅ LLM Integration**: Ollama with Gemma 3 4B model for question answering
+4. **✅ Citation System**: Source attribution with document references
+5. **✅ Query Processing**: Full RAG functionality with context-aware responses
+
+## 🔄 Future Enhancements
 
 ### Additional Features
 1. **Authentication**: Add user authentication and authorization
